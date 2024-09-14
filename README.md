@@ -1,5 +1,5 @@
-# prediction-model
-## Predicting Loan Defaults using Logistic Regression and Decision trees
+
+# Predicting Loan Defaults using Logistic Regression and Decision trees
 ### Introduction
 This project aims to predict loan defaults using Logistic Regression and Decision Tree models. By analyzing various factors related to borrowers and loan characteristics, we seek to help banks assess the risk of loan default more accurately.
 
