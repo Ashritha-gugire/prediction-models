@@ -1,0 +1,670 @@
+---
+title: "FinalProject GBUS"
+output: html_document
+date: "2023-10-18"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r}
+loan_data<- readRDS("C:\\Users\\ashri\\Documents\\GBUS 738\\Final project\\loandata.rds")
+```
+
+
+```{r}
+
+str(loan_data)
+```
+```{r}
+library(dplyr)
+glimpse(loan_data)
+```
+
+```{r}
+colSums(is.na(loan_data))
+```
+
+
+```{r}
+summary(loan_data)
+```
+From the above summary statistics we can understand that number of people who defaulted the loan are less when compared with those who didn't. That indicates most of them did there payments on time. 
+If we observe the average loan amount borrowed was $16K and average monthly installment was 489 with interest rate of 11.38%, and most of them has purpose because of debt consolidation and they were individuals who took for a period of three years and many of them have an average of 73k annual income.
+
+In here we cannot get a detailed statistics about anything. Therefore, lets try to understand the data deeply in ordered to find which factors are related for defaulting the loan and how many costly errors is the model expected to produce (customers classified as not defaulting, but eventually do)
+
+```{r}
+library(skimr)
+skim(loan_data)
+```
+```{r}
+loan_data %>%
+  skim() %>%
+  dplyr::filter(n_missing > 0)
+#loan_dataa %>%
+ # skim_without_charts()
+```
+
+```{r}
+library(psych)
+pairs.panels(loan_data,method= "pearson",stars=TRUE)
+```
+
+
+```{r}
+#loan_data= as.numeric(loan_default)
+#cor.test(loan_data$loan_default, loan_data$loan_purpose, method=c("kendall"))
+#install.packages("gmodels")
+library(gmodels)
+CrossTable(loan_data$loan_default)
+```
+
+```{r}
+CrossTable(loan_data$history_bankruptcy, loan_data$loan_default, prop.r = TRUE, prop.c = FALSE, prop.t = FALSE, prop.chisq = FALSE)
+## 
+```
+```{r}
+which(is.na(loan_data$loan_amount))
+```
+
+##Data Analysis
+
+We will first look at the distributions of and between some characteristics of the loan or the borrower of the loan. This will help us determine which predictor variables may have interesting patterns.
+
+
+```{r}
+library(ggplot2)
+ggplot(data = loan_data, mapping = aes(x = interest_rate)) +
+geom_histogram(fill = "#006EA1", color = "white", bins = 15) +
+labs(title = "Figure 1: Distribution of people defaulting their loans in relation to interest rates", x =
+"interest rates", y = "number of people defaulting their loans")+facet_grid(loan_default ~ history_bankruptcy)
+```
+
+```{r}
+loan_data %>% group_by(interest_rate) %>% summarise(count = n()) %>% ggplot() +
+    geom_col(aes(x = interest_rate, y = count, fill = count >= 40), width = 0.05) +
+# fill colors
+    scale_fill_manual(values = c("darksalmon", "lightskyblue3"), labels = c("count < 40", "count >= 40"),
+                     guide = guide_legend(reverse=TRUE)) +
+# theme
+    theme_classic() + theme(plot.title = element_text(hjust = 0.5), legend.position = c(0.9, 0.9)) +
+# labels
+    labs(x = "Interest Rate (in %)", y = "Frequency",
+         title = "Figure 2.Frequency of Individual Interest Rates", fill = "Count") + 
+# scales
+    scale_x_continuous(expand = c(0,0)) +
+    scale_y_continuous(expand = c(0,0), limits = c(0, 100))
+    
+```
+```{r}
+loan_data %>% group_by(loan_amount) %>% summarise(count = n()) %>% ggplot() +
+    geom_col(aes(x = loan_amount, y = count, fill = count >= 40), width = 50) +
+# fill colors
+    scale_fill_manual(values = c("darksalmon", "lightskyblue3"), labels = c("count < 40", "count >= 40"),
+                     guide = guide_legend(reverse=TRUE)) +
+# theme
+    theme_classic() + theme(plot.title = element_text(hjust = 0.5), legend.position = c(0.9, 0.9)) +
+# labels
+    labs(x = "Loan Amount (in thousands)", y = "Frequency",
+         title = "Figure 3. Frequency of Individual Loan Amounts", fill = "Count") + 
+# scales
+    scale_x_continuous(expand = c(0,0), labels = seq(0, 40, 10)) +
+    scale_y_continuous(expand = c(0,0), limits = c(0, 200))
+```
+From the above two graphs, it is interesting to note that the values of interest rate and loan amount have varied frequency, with some values occurring over 40 times in the dataset and others occurring only once. This is probably because some interest rates and amounts are more popular as parts of standard loan pacakges.
+
+```{r}
+#str(loan_data)
+loan_data %>% group_by(loan_purpose) %>% summarise(count = n()) %>% ggplot() +
+    geom_col(aes(x = reorder(loan_purpose, count), y = count, fill = count<30)) +
+# fill colors
+    scale_fill_manual(values = c("lightsteelblue", "darksalmon"),
+                     labels = c( "count < 30")) +
+# theme
+    theme_classic() + theme(axis.text.x = element_text(size = 9, angle = 20, hjust = 0.7),
+                            plot.title = element_text(hjust = 0.5),
+                           legend.position = "bottom") +
+# labels
+    labs(x = "purpose", y = "Frequency", fill = "Count",
+         title = "Distribution of Reasons for Taking Out Loan")
+
+
+
+
+ggplot(data = loan_data, aes(x = term)) +
+    geom_bar(position= "dodge",fill= "lightblue") +
+# theme
+    theme_classic() + theme(plot.title = element_text(hjust = 0.5)) +
+# labels
+    labs(x = "Term of Loan (in Years)", y = "Frequency",
+         title = "Figure 4: Distribution of Loan Terms")
+
+```
+
+In the above first figure it is clear that debt are the most common reasons that borrowers take out loans.This is probably because people take out loans to pay off pre-existing debts or to pay off  bills, and there is no high variability between the categories provided.
+
+In the above second figure we get to know that there are far more short-term loans than lon- term loans.
+```{r}
+clean <- loan_data %>% filter(annual_income < 70000 &  debt_to_income <15 )
+
+clean %>% ggplot(aes(x = annual_income, y = debt_to_income, col = annual_income* 1200 + 9000 < debt_to_income))+
+    geom_point(show.legend = FALSE) +geom_smooth(color='black')+
+# fill colors
+    scale_color_manual(values = c("lightskyblue3", "darksalmon")) +
+# theme
+    theme_classic() + theme(plot.title = element_text(hjust = 0.5)) +
+# labels
+    labs(x = "anuual income", y = "debt(in thousands)",
+         title = "Figure 5: Relationship between annual income and debt ratio ") 
+
+
+ggplot(data = loan_data, aes(x = current_job_years, y = years_credit_history))+
+    geom_point(show.legend = FALSE) +geom_smooth(color='black')+
+# fill colors
+    scale_color_manual(values = c("lightskyblue3")) +
+# theme
+    theme_classic() + theme(plot.title = element_text(hjust = 0.5)) +
+# labels
+    labs(x = "Employed for years", y = "crediot history",
+         title = "Figure 6: Relationship between job years and year credit history ") 
+
+```
+```{r}
+hist(loan_data$loan_amount, 
+     main="Histogram for LoanAmount", 
+     xlab="Loan Amount", 
+     border="blue", 
+     col="maroon",
+     las=1, 
+     breaks=20, prob = TRUE)
+boxplot(loan_data$loan_amount, col='maroon',xlab = 'LoanAmount', main = 'Box Plot for Loan Amount')
+
+
+hist(loan_data$annual_income, 
+     main="Histogram for Applicant Income", 
+     xlab="Income", 
+     border="blue", 
+     col="maroon",
+     las=1, 
+     breaks=50, prob = TRUE)
+boxplot(loan_data$annual_income, col='maroon',xlab = 'LoanAmount', main = 'Box Plot for Loan Amount')
+```
+```{r}
+data(loan_data, package="lattice")
+ggplot(data=loan_data, aes(x=loan_amount, fill=loan_purpose)) +
+  geom_density() +
+  facet_grid(loan_purpose~.)
+
+
+
+data(loan_data, package="lattice")
+ggplot(data=loan_data, aes(x=interest_rate, fill=history_bankruptcy)) +
+  geom_density() +
+  facet_grid(history_bankruptcy~.)
+```
+#Q) Create a histogram to visualize the distribution of loan amounts for default and non-default customers
+```{r}
+
+ggplot(loan_data, aes(x = loan_amount, fill = term)) +
+  geom_histogram(color="#e9ecef",alpha=0.6, position = 'identity') +
+  scale_fill_manual(values=c("#69b3a2", "#404080")) +
+    labs(fill="data")+facet_wrap(~loan_default)
+
+```
+
+#Q.Are there any differences in loan default rates and loan amount by annual income?
+```{r}
+
+loan_data$loan_default <- as.numeric(unlist(loan_data$loan_default))
+loan_data$loan_amount <- as.numeric(loan_data$loan_amount)
+
+default_by_income <-loan_data%>% 
+  group_by(loan_default, loan_amount, annual_income,loan_purpose)%>%
+  summarise(n_customers = n(),
+  customers_default = sum(loan_default == "Yes"),
+  default_percent = 100 * mean(loan_default == "Yes"))
+
+
+default_by_income$loan_defaultNew <- cut(default_by_income$loan_default, breaks = 2, labels = c("Yes", "No"))
+
+
+
+
+ggplot(default_by_income, aes(x= loan_amount, y= annual_income, fill= loan_defaultNew))+
+  geom_bar(stat ="identity", position = position_dodge())+
+  labs(title = "Relation between loan default and annual income by purpose", x="loan amount", y= "annual income") + scale_fill_manual(values = c("No" = "blue", "Yes"= "Red"))+
+  theme_minimal()+facet_wrap(~loan_purpose)
+```
+
+#Q. What is the relationship between loan default, application type and interest rate?
+
+```{r}
+# Group the data by 'loan_default' and 'application_type'
+#install.packages("virdis")
+library(viridis)
+
+default_applicationtype<- loan_data %>%
+  group_by(loan_default, application_type,loan_purpose) %>%
+  summarize(mean_interest_rate = mean(interest_rate))
+
+
+ggplot(default_applicationtype, aes(x = loan_default, y = mean_interest_rate, group = application_type,color = application_type)) +
+  geom_line() +scale_color_viridis(discrete = TRUE)+
+  ggtitle("application type responsible for defaulting the loan")+ ylab("Mean interest rate")+facet_wrap(~loan_purpose)
+  
+```
+#Q) Find out the relationship between credit history and loan default by missed payments
+```{r}
+ggplot(data = loan_data, mapping = aes(x = loan_default, y = years_credit_history)) +
+geom_jitter() + facet_wrap(~ missed_payment_2_yr, nrow = 2)+labs(title = "credit history vs loan default")
+```
+
+#Q)Create a scatter plot to explore the relationship between the number of open accounts and loan default
+```{r}
+ggplot(loan_data, aes(y = total_credit_lines, x = loan_default, color = term)) +
+  geom_jitter() +
+  labs(title = "Number of Open Accounts vs. Loan Default", y = "Number of Open Accounts", x = "Loan Default")+facet_grid(~ history_bankruptcy)
+
+```
+
+
+
+## Predictive Modelling
+
+#1. Decision Trees
+```{r}
+#lets convert all of them to double or integer
+
+loan_data<- loan_data%>% mutate(loan_default = ifelse(loan_data$loan_default== 1 , "yes" , "no"))
+loan_data$loan_default <- as.factor(loan_data$loan_default)
+
+
+loan_data<- loan_data%>% mutate(application_type= ifelse(loan_data$application_type== "individual" , 1 , 0))
+loan_data<- loan_data%>% mutate(missed_payment_2_yr = ifelse(loan_data$missed_payment_2_yr== "yes" , 1 , 0))
+loan_data<- loan_data%>% mutate(history_bankruptcy = ifelse(loan_data$history_bankruptcy== "yes" , 1 , 0))
+loan_data<- loan_data%>% mutate(history_tax_liens = ifelse(loan_data$history_tax_liens== "yes" , 1 , 0))
+loan_data<- loan_data %>% mutate(term= ifelse(loan_data$term == "three_year" , 3, 5))
+loan_data$homeownership<-c(mortgage=1,rent=2,own=3)[loan_data$homeownership]
+loan_data$loan_purpose<-c(debt_consolidation=1,credit_card=2,medical=3,small_business=4, home_improvement = 5)[loan_data$loan_purpose]
+```
+
+
+```{r}
+
+set.seed(123)
+
+library(tidymodels)
+
+loan_data_split <- initial_split(loan_data, prop = 0.7, strata = loan_default)
+loan_training <- loan_data_split %>% training()
+loan_test <- loan_data_split %>% testing()
+```
+
+```{r}
+#creating a recipe
+
+loan_recipe <- recipe(loan_default ~. , data = loan_data) %>% 
+  step_center(all_predictors()) %>%
+  step_scale(all_predictors())
+```
+
+```{r}
+library(parsnip)
+
+loan_model <- decision_tree(mode = "classification") %>%
+  set_engine("rpart") %>%
+  set_mode("classification")
+
+loan_model
+```
+
+```{r}
+loan_workflow <- workflow() %>% 
+  add_recipe(loan_recipe) %>%
+  add_model(loan_model)
+
+loan_workflow
+```
+
+```{r}
+
+str(loan_data)
+loan_fit <- loan_workflow %>% fit(data = loan_training)
+```
+#hyperparameter tuning
+```{r}
+#define a grid for tuning the complexity parameter(cp)
+#tree_grid <- grid_regular(cp = tune())
+folds<- vfold_cv(loan_training, v= 5)
+cp_grid <- expand.grid(cp = seq(0.01,0.5, by=0.01))
+
+
+#perform hyperparameter tuning
+
+tree_tune <- tune_grid(
+  loan_workflow,
+  resamples = folds,
+  grid = cp_grid,
+  control = control_grid(verbose = TRUE)
+)
+
+#select the best model
+
+best_tree_model <- select_best(tree_tune)
+```
+
+
+```{r}
+library(rpart)
+library(rpart.plot)
+
+tree_model <- rpart(loan_default ~. , data = loan_training, maxdepth= 4,cp= best_tree_model)
+summary(tree_model)
+
+rpart.plot(tree_model, type=4, digits = -3, box.palette = "GnBu", branch.lty = 5, branch.lwd = 3, shadow.col = "gray",gap = 0, tweak =1.1)
+```
+
+```{r}
+#make predictions on the test set
+predictions <-loan_fit%>% predict(new_data=loan_test) %>% bind_cols(loan_test %>% select(loan_default))
+```
+
+```{r}
+library(yardstick)
+
+confusion_matrix <- conf_mat(predictions, truth= loan_default, estimate = .pred_class)
+
+confusion_matrix
+```
+363 instances were correctly classified as "yes."
+770 instances were correctly classified as "no."
+96 instances were falsely classified as "yes" when they were actually "no."
+5 instances were falsely classified as "no" when they were actually "yes."
+```{r}
+accuracy(predictions, truth = loan_default, estimate = .pred_class)
+
+precision(predictions, truth = loan_default, estimate = .pred_class)
+
+recall(predictions, truth = loan_default, estimate = .pred_class)
+
+f_meas(predictions, truth = loan_default, estimate = .pred_class)
+```
+```{r}
+#predicted_probabilities <- predictions[,"yes"]
+
+
+#predictions$.pred_class=as.numeric(predictions$.pred_class)
+#predicted_probabilities <- as.vector(predictions)
+#actual_class <- as.numeric (loan)
+```
+
+#model 2 LOGISTIC REGRESSION
+```{r}
+loan_logis_model <- logistic_reg() %>%
+  set_engine("glm") %>%
+  set_mode("classification")
+```
+
+```{r}
+logistic_model<- glm(loan_default ~. , data= loan_training, family= binomial)
+summary(logistic_model)
+```
+
+```{r}
+actual_class <- as.numeric(loan_test$loan_default == "yes")
+
+logistic_prediction <- predict(logistic_model, newdata = loan_test, type ="response")
+```
+
+```{r}
+threshold <- 0.5
+predicted_classes <- ifelse(logistic_prediction > threshold, "yes", "no")
+logistic_confusion_matrix <- table(predicted = predicted_classes, actual = loan_test$loan_default)
+
+logistic_confusion_matrix
+
+```
+
+```{r}
+accuracy <- (logistic_confusion_matrix[1] + logistic_confusion_matrix[4]) / sum(logistic_confusion_matrix)
+
+precision <- logistic_confusion_matrix[4] / sum(logistic_confusion_matrix[c(2, 4)])
+
+recall <- logistic_confusion_matrix[4] / sum(logistic_confusion_matrix[c(3, 4)])
+
+f1_score <- 2 * (precision * recall) / (precision + recall)
+
+print(paste("Accuracy:", accuracy))
+print(paste("Precision:", precision))
+print(paste("Recall:", recall))
+print(paste("F1 Score:", f1_score))
+```
+```{r}
+library(ROCR)
+library(pROC)
+```
+
+```{r}
+
+loan_test <- loan_test %>% mutate(loan_default = ifelse(loan_test$loan_default== "yes", 1,0))
+predictions$loan_default <- c(yes = 1, no=0)[predictions$loan_default]
+predictions$.pred_class <- c(yes = 1, no=0)[predictions$.pred_class]
+str(predictions)
+str(loan_test)
+predictions$loan_default<- as.numeric(predictions$loan_default)
+predictions$.pred_class<- as.numeric(predictions$.pred_class)
+
+sim_roc <- roc(response = predictions$loan_default,
+               predictor = predictions$.pred_class,
+               levels = c('0', '1'))
+
+ggroc(sim_roc)
+#autoplot(sim_roc)
+```
+```{r}
+library(boot)
+library(ModelMetrics)
+
+# Weighted accuracy function
+weighted_accuracy <- function(truth, preds, weight1 = 0.93, weight0 = 0.07) {
+
+    # Takes in the true y values and raw predictions, as well as weights
+    # Returns 0.93/norm * (# accurate preds where truth = 1) + 0.07/norm * (# accurate preds where truth = 0)
+    # where norm = 0.93 * (# truth = 1) + 0.07 * (# truth = 0)
+
+    bin_preds = preds > 0.5 # binarize predictions
+    ind1 = which(truth == 1)
+    ind0 = which(truth == 0)
+    sum_weights = weight1 * length(ind1) + weight0 * length(ind0) # normalize by this so weights sum to 1
+    weighted_acc = weight1/sum_weights * sum(truth[ind1] == bin_preds[ind1]) +
+    weight0/sum_weights * sum(truth[ind0] == bin_preds[ind0])
+    return(weighted_acc)
+}
+
+predictive_accuracy <- function(truth, preds) {
+    bin_preds = preds > 0.5
+    pred_acc = mean(truth == bin_preds)
+    return(pred_acc)
+}
+
+# AUC function
+AUC <- function(truth, preds) {
+    return(auc(truth, preds))
+}
+
+add <- function(name, formula) {
+    string = paste("model_", name, sep = "")
+    
+    weighted = cv.glm(loan, get(string), cost = weighted_accuracy, K = 5)$delta[2]
+    pred_acc = cv.glm(loan, get(string), cost = predictive_accuracy, K = 5)$delta[2]
+    auc = cv.glm(loan, get(string), cost = AUC, K = 5)$delta[2]
+    
+    models <<- rbind(models, c(formula, weighted, pred_acc, auc, NA))
+}
+```
+```{r}
+models = data.frame(formula = c(""), weighted_accuracy = c(""), predictive_accuracy = c(""), AUC = c(""), AIC = c(""), 
+                    stringsAsFactors = F)
+
+
+# model_1:
+model_1 = glm(loan_default ~ loan_amount * interest_rate+ loan_amount + interest_rate, data = loan_data, family = "binomial")
+
+
+# Hand-coded cross-validation
+set.seed(293)
+
+# 1. assign each observation a fold num
+k = 5
+folds = sample(1:k, nrow(loan_data), replace = T)
+
+results_AIC = c()
+
+# 2. for each fold, train on train set, test on test set, calculate eval metrics
+for(i in 1:k) {
+    loan_val <- loan_data[folds == i,] # roughly 1/k of the data
+    loan_train <- loan_data[folds != i,]
+    
+    model <- glm(loan_default ~ loan_amount * interest_rate+ loan_amount + interest_rate, data = loan_train, family = "binomial")
+    results_AIC <<- c(results_AIC, AIC(model))
+}
+# take the average of eval metrics over all folds for the CV metric value
+models[nrow(models), 5] = mean(as.numeric(results_AIC))
+
+
+# model_2:
+model_2 = glm(loan_default ~ annual_income + loan_amount + interest_rate, data = loan_data, family = "binomial")
+#add("2", "default ~ income + amount + interest")
+
+folds = sample(1:k, nrow(loan_data), replace = T)
+results_AIC = c()
+for(i in 1:k) {
+    loan_val <- loan_data[folds == i,]
+    loan_train <- loan_data[folds != i,]
+    model <- glm(loan_default ~ annual_income + loan_amount + interest_rate, data = loan_train, family = "binomial")
+    results_AIC <<- c(results_AIC, AIC(model))
+}
+models[nrow(models), 5] = mean(as.numeric(results_AIC))
+
+
+# model_3:
+model_3 = glm(loan_default ~ current_job_years + term + loan_amount + interest_rate, data = loan_data, family = "binomial")
+#add("3", "default ~ employment + term + amount + interest")
+
+folds = sample(1:k, nrow(loan_data), replace = T)
+results_AIC = c()
+for(i in 1:k) {
+    loan_val <- loan_data[folds == i,]
+    loan_train <- loan_data[folds != i,]
+    model <- glm(loan_default ~ current_job_years + term + loan_amount + interest_rate, data = loan_train, family = "binomial")
+    results_AIC <<- c(results_AIC, AIC(model))
+}
+models[nrow(models), 5] = mean(as.numeric(results_AIC))
+
+
+# model_4: 0.6988636  default ~ interest + amount + term + income + interest * amount
+model_4 = glm(loan_default ~ loan_amount * interest_rate + term +annual_income + loan_amount + interest_rate, data = loan_data, family = "binomial")
+#add("4", "default ~ amount * interest + term + income + amount + interest")
+
+folds = sample(1:k, nrow(loan_data), replace = T)
+results_AIC = c()
+for(i in 1:k) {
+    loan_val <- loan_data[folds == i,]
+    loan_train <- loan_data[folds != i,]
+    model <- glm(loan_default ~ loan_amount * interest_rate + term +annual_income + loan_amount + interest_rate, data = loan_train,
+                 family = "binomial")
+    results_AIC <<- c(results_AIC, AIC(model))
+}
+models[nrow(models), 5] = mean(as.numeric(results_AIC))
+
+# 1. assign each observation a fold num
+k = 5
+folds = sample(1:k, nrow(loan_data), replace = T)
+
+results = data.frame(AUC = c(""), weighted_accuracy = c(""), predictive_accuracy = c(""),
+                    stringsAsFactors = F)
+
+# 2. for each fold, train on train set, test on test set, calculate eval metrics
+for(i in 1:k) {
+    loan_val <- loan_data[folds == i,] # roughly 1/k of the data
+    loan_train <- loan_data[folds != i,]
+    
+    # AUC
+    auc = auc(loan_train$loan_default, loan_train$loan_amount)
+    
+    # weighted accuracy
+    weight1 = 0.93
+    weight0 = 0.07
+
+    bin_preds = loan_train$loan_amount
+    ind1 = which(loan_train$loan_default == 1)
+    ind0 = which(loan_train$loan_default == 0)
+    sum_weights = weight1 * length(ind1) + weight0 * length(ind0) # normalize by this so weights sum to 1
+    weighted_acc = weight1/sum_weights * sum(loan_train$loan_default[ind1] == bin_preds[ind1]) +
+    weight0/sum_weights * sum(loan_train$loan_default[ind0] == bin_preds[ind0])
+    
+    # predicted accuracy
+    pred_acc = mean(loan_train$loan_amount == loan_train$loan_default)
+
+    # insert results into resulting dataframe where appropriate
+    results <<- rbind(results, as.numeric(c(auc, weighted_acc, pred_acc)))
+}
+results = results[-1,]
+
+# take the average of eval metrics over all folds for the CV metric value
+models <<- rbind(models, c("null model", mean(as.numeric(results$weighted_accuracy)),
+                           mean(as.numeric(results$AUC)),
+                           mean(as.numeric(results$predictive_accuracy)), NA))
+
+models = models[-1,]
+models
+```
+```{r}
+#install.packages("pROC")
+library(pROC)
+roc(loan_data$loan_default, model_1$fitted.values, plot = T, xlab = "False Positive %", ylab = "True Positive %",
+    col = "darksalmon", lwd = 3)
+plot.roc(loan_data$loan_default, model_4$fitted.values, add = T, col = "mediumseagreen", lwd = 3)
+plot.roc(loan_data$loan_default, model_2$fitted.values, add = T, col = "wheat4", lwd = 3)
+random_fitted.values = rep(mean(loan_data$loan_default), 2840)
+#plot.roc(loan_data$loan_default, random_fitted.values, add = T, col = "wheat4", lwd = 3)
+
+legend(0.74, 0.2,
+       legend = c("interest, amount, interest * amount",
+#                  "interest, amount, income",
+#                  "interest, amount, term, employment",
+                  "interest, amount, income, term, interest * amount",
+#                  "interest, amount, income, term, employments_1,",
+#                  "  interest * amount",
+                  "interest, income, reasons, employments, high_bal,",
+                  "  high_ratio, v5",
+                  "null model"),
+       col = c("darksalmon", "mediumseagreen",
+               "darkorchid", "aliceblue", "wheat4"),
+       box.col = "lightsteelblue2", bg = "aliceblue", lty = 1:1, cex = 0.8, lwd = 2)
+
+title(main = "Figure 17: AUC Curves of Different Models", line = 3)
+```
+```{r}
+summary(model_1)
+```
+```{r}
+summary(model_2)
+```
+```{r}
+summary(model_3)
+```
+
+```{r}
+
+summary(model_4)
+```
+
